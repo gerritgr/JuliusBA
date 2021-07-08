@@ -14,14 +14,23 @@ Continuous-time stochastic simulation of epidemic spreading on human-to-human co
 '''
 ## Epidemic Model
 '''
-option_model = st.selectbox('Spreading Model', ('Custom', 'SI'))
+option_model = st.selectbox('Spreading Model', ('SI model', 'SEIRS model', 'Custom'))
 
-if option_model == 'SI':
+if option_model == 'SI model':
     st.markdown(f'States: `S,I`')
     #r1 = st.slider('S->I', min_value=1.0, max_value=200.0, value=20.0)
-    r1 = st.slider('I+S->I+I', min_value=0.0, max_value=20.0, value=0.5)
+    r1 = st.slider('I+S->I+I', min_value=0.0, max_value=20.0, value=0.5, key='si_r1')
     states_eval = ["S", "I"]
     rules_eval = [(("I", "S"), ("I", "I"), float(r1))]
+elif option_model == 'SEIRS model':
+    st.markdown(f'States: `S,E,I,R`')
+    #r1 = st.slider('S->I', min_value=1.0, max_value=200.0, value=20.0)
+    r1 = st.slider('I+S->I+E', min_value=0.0, max_value=20.0, value=0.5, key='seirs_r1')
+    r2 = st.slider('E->I', min_value=0.0, max_value=20.0, value=0.5, key='seirs_r2')
+    r3 = st.slider('I->R', min_value=0.0, max_value=20.0, value=0.5, key='seirs_r3')
+    r4 = st.slider('R->S', min_value=0.0, max_value=20.0, value=0.5, key='seirs_r4')
+    states_eval = ["S", "E", "I", "R"]
+    rules_eval = [(("I", "S"), ("I", "I"), float(r1)), ("E", "I", float(r2)),("I", "R", float(r3)),("R", "S", float(r4))]
 else:
     states = ["S", "I", "R"]
     rules = [("I", "R", 1.0),  # spontaneous rule  I -> R with rate 1.0
@@ -34,15 +43,29 @@ else:
     states_eval = eval('"' + epidemic_states_text.replace(',','","')+'"')
     rules_eval = eval('[' + epidemic_model_text.replace('\n',',') + ' ]')
 
+states_eval = sorted(list(set(states_eval)))
 
 '''
 ## Contact Network
 '''
 import networkx as nx
-option_network = st.selectbox('Contact Network', ('Custom', 'Karate'))
+option_network = st.selectbox('Contact Network', ('Karate', '2D-Grid', 'Geometric', 'Custom'))
 
 if option_network == 'Karate':
     G = nx.karate_club_graph()
+    edges = list(G.edges)
+    st.markdown('Edges: `{}`'.format(repr(edges)))
+elif option_network == '2D-Grid':
+    dim = st.slider('Dimension', min_value=1.0, max_value=10.0, value=5.0, step=1.0, key='2d_dim')
+    dim = int(dim)
+    G = nx.grid_2d_graph(dim, dim)
+    edges = list(G.edges)
+    st.markdown('Edges: `{}`'.format(repr(edges)))
+elif option_network == 'Geometric':
+    nodenum = st.slider('Node-Num', min_value=1.0, max_value=300.0, value=200.0, step=1.0, key='nodenum')
+    density = st.slider('Node-Num', min_value=0.01, max_value=0.5, value=0.125, key='density')
+    nodenum = int(nodenum)
+    G = nx.random_geometric_graph(nodenum, density, seed=42)
     edges = list(G.edges)
     st.markdown('Edges: `{}`'.format(repr(edges)))
 else:
@@ -80,7 +103,7 @@ node_num = G.number_of_nodes()
 
 states_slider = dict()
 for s in states_eval:
-    x = st.slider('Init Number '+str(s), min_value=0.0, max_value=float(node_num), value=1.0,step=1.0)
+    x = st.slider('Init Number '+str(s), min_value=0.0, max_value=float(node_num), value=1.0,step=1.0, key='init_'+str(s)+str(node_num))
     states_slider[s] = x
 
 slider_sum = np.sum(list(states_slider.values()))
@@ -95,7 +118,7 @@ states_slider_normal[s0] = int(G.number_of_nodes() - slider_sum_normal_expects1)
 '''
 ## Run Simulation
 '''
-horizon_slider = st.slider('Horizon', min_value=1.0, max_value=200.0, value=20.0)
+horizon_slider = st.slider('Horizon', min_value=1.0, max_value=200.0, value=20.0, key='H')
 
 click_run = st.button('Run Simulation')
 
@@ -127,7 +150,7 @@ if click_run or 'chart_data' in st.session_state:
         ct_value = st.session_state.ct_value
     else:
         ct_value = 0.0
-    current_time_slider = st.slider('Timepoint', min_value=0.0, max_value=st.session_state['horizon'], value=0.0, step=0.1)
+    current_time_slider = st.slider('Timepoint', min_value=0.0, max_value=st.session_state['horizon'], value=0.0, step=0.1, key='current_time')
     st.session_state['ct_value'] = current_time_slider
 
 
